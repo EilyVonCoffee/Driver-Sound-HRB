@@ -14,6 +14,9 @@ class AudioTestService {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.windows);
 
+  bool get isSystemSpectrumSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
   Future<bool> startTestTone(
     double frequencyHz, {
     bool pinkNoise = false,
@@ -44,6 +47,22 @@ class AudioTestService {
         false;
   }
 
+  Future<bool> startSystemSpectrumCapture() async {
+    if (!isSystemSpectrumSupported) return false;
+    return await _channel.invokeMethod<bool>('startSystemSpectrum') ?? false;
+  }
+
+  Future<void> stopSystemSpectrumCapture() async {
+    if (isSystemSpectrumSupported) {
+      await _channel.invokeMethod<Object?>('stopSystemSpectrum');
+    }
+  }
+
+  Future<bool> isSystemSpectrumCaptureActive() async {
+    if (!isSystemSpectrumSupported) return false;
+    return await _channel.invokeMethod<bool>('isSystemSpectrumActive') ?? false;
+  }
+
   Future<bool> configureEq({
     required List<EqBand> bands,
     required double preampDb,
@@ -65,9 +84,12 @@ class AudioTestService {
         false;
   }
 
-  Future<List<double>> readSpectrum() async {
+  Future<List<double>> readSpectrum({bool systemAudio = false}) async {
     if (!isSupported) return const [];
-    final bins = await _channel.invokeMethod<List<Object?>>('readSpectrum');
+    if (systemAudio && !isSystemSpectrumSupported) return const [];
+    final bins = await _channel.invokeMethod<List<Object?>>(
+      systemAudio ? 'readSystemSpectrum' : 'readSpectrum',
+    );
     return bins
             ?.whereType<num>()
             .map((value) => value.toDouble())

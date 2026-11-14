@@ -9,6 +9,7 @@ endif()
 
 add_library(iem_windows_endpoint STATIC
     EndpointNotificationClient.cpp
+    WasapiLoopbackCapture.cpp
     WasapiToneEngine.cpp
 )
 target_include_directories(iem_windows_endpoint PUBLIC .)

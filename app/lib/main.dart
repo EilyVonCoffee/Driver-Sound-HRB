@@ -135,6 +135,7 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
   String? _activePresetName;
   bool _profileModified = false;
   bool _testAudioRunning = false;
+  bool _systemSpectrumRunning = false;
   bool _spectrumReadPending = false;
   double _testFrequencyHz = 1000;
   bool _pinkNoiseEnabled = false;
@@ -176,6 +177,7 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
     _spectrumTimer?.cancel();
     _audioHealthTimer?.cancel();
     unawaited(_audioTestService.stopTestAudio());
+    unawaited(_audioTestService.stopSystemSpectrumCapture());
     super.dispose();
   }
 
@@ -485,6 +487,8 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
       return;
     }
 
+    if (_systemSpectrumRunning) await _stopSystemSpectrum();
+
     try {
       final started = await _audioTestService.startTestTone(
         _testFrequencyHz,
@@ -496,19 +500,47 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
         return;
       }
       setState(() => _testAudioRunning = true);
-      _spectrumTimer?.cancel();
-      _spectrumTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
-        unawaited(_readNativeSpectrum());
-      });
-      _audioHealthTimer?.cancel();
-      _audioHealthTimer =
-          Timer.periodic(const Duration(milliseconds: 500), (_) {
-        unawaited(_checkNativeAudioHealth());
-      });
+      _startSpectrumTimers();
       await _readNativeSpectrum();
     } catch (error) {
       if (mounted) _showMessage('Could not start test tone: $error');
     }
+  }
+
+  Future<void> _toggleSystemSpectrum() async {
+    if (!_audioTestService.isSystemSpectrumSupported) return;
+    if (_systemSpectrumRunning) {
+      await _stopSystemSpectrum();
+      return;
+    }
+    if (_testAudioRunning) await _stopTestTone();
+
+    try {
+      final started = await _audioTestService.startSystemSpectrumCapture();
+      if (!started) {
+        throw StateError('No default playback endpoint is available.');
+      }
+      if (!mounted) {
+        await _audioTestService.stopSystemSpectrumCapture();
+        return;
+      }
+      setState(() => _systemSpectrumRunning = true);
+      _startSpectrumTimers();
+      await _readNativeSpectrum();
+    } catch (error) {
+      if (mounted) _showMessage('Could not monitor PC audio: $error');
+    }
+  }
+
+  void _startSpectrumTimers() {
+    _spectrumTimer?.cancel();
+    _spectrumTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
+      unawaited(_readNativeSpectrum());
+    });
+    _audioHealthTimer?.cancel();
+    _audioHealthTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      unawaited(_checkNativeAudioHealth());
+    });
   }
 
   Future<void> _stopTestTone() async {
@@ -529,12 +561,38 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _stopSystemSpectrum() async {
+    _spectrumTimer?.cancel();
+    _spectrumTimer = null;
+    _audioHealthTimer?.cancel();
+    _audioHealthTimer = null;
+    try {
+      await _audioTestService.stopSystemSpectrumCapture();
+    } catch (error) {
+      if (mounted) _showMessage('Could not stop PC audio monitor: $error');
+    }
+    if (mounted) {
+      setState(() {
+        _systemSpectrumRunning = false;
+        _spectrumBins = null;
+      });
+    }
+  }
+
   Future<void> _readNativeSpectrum() async {
-    if (_spectrumReadPending || !_testAudioRunning) return;
+    if (_spectrumReadPending ||
+        (!_testAudioRunning && !_systemSpectrumRunning)) {
+      return;
+    }
+    final readSystemAudio = _systemSpectrumRunning;
     _spectrumReadPending = true;
     try {
-      final bins = await _audioTestService.readSpectrum();
-      if (mounted && _testAudioRunning && bins.length == 64) {
+      final bins = await _audioTestService.readSpectrum(
+        systemAudio: readSystemAudio,
+      );
+      final sameModeStillActive =
+          readSystemAudio ? _systemSpectrumRunning : _testAudioRunning;
+      if (mounted && sameModeStillActive && bins.length == 64) {
         setState(() => _spectrumBins = bins);
       }
     } catch (_) {
@@ -545,16 +603,25 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
   }
 
   Future<void> _checkNativeAudioHealth() async {
-    if (!_testAudioRunning) return;
+    final checkingSystemAudio = _systemSpectrumRunning;
+    if (!_testAudioRunning && !checkingSystemAudio) return;
     try {
-      if (!await _audioTestService.isTestAudioActive() && mounted) {
+      final active = checkingSystemAudio
+          ? await _audioTestService.isSystemSpectrumCaptureActive()
+          : await _audioTestService.isTestAudioActive();
+      final modeStillActive =
+          checkingSystemAudio ? _systemSpectrumRunning : _testAudioRunning;
+      if (!active && modeStillActive && mounted) {
         _spectrumTimer?.cancel();
         _audioHealthTimer?.cancel();
         setState(() {
           _testAudioRunning = false;
+          _systemSpectrumRunning = false;
           _spectrumBins = null;
         });
-        _showMessage('Audio output stopped. Reconnect the device and retry.');
+        _showMessage(checkingSystemAudio
+            ? 'PC audio capture stopped. Restart the monitor to retry.'
+            : 'Audio output stopped. Reconnect the device and retry.');
       }
     } catch (_) {
       // Keep the active state during a transient method-channel failure.
@@ -1257,11 +1324,28 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
                         fontWeight: FontWeight.w500)),
               ),
               Text(
-                _testAudioRunning ? 'LIVE FFT' : 'FFT',
+                _systemSpectrumRunning
+                    ? 'SYSTEM LOOPBACK'
+                    : _testAudioRunning
+                        ? 'LIVE TEST'
+                        : 'FFT',
                 style: const TextStyle(
                     color: _muted, fontSize: 11, fontFamily: 'monospace'),
               ),
               const SizedBox(width: 4),
+              if (_audioTestService.isSystemSpectrumSupported)
+                IconButton(
+                  tooltip: _systemSpectrumRunning
+                      ? 'Stop PC audio monitor'
+                      : 'Monitor PC audio',
+                  onPressed: _toggleSystemSpectrum,
+                  icon: Icon(
+                    _systemSpectrumRunning
+                        ? Icons.stop_circle_outlined
+                        : Icons.graphic_eq_outlined,
+                    color: _systemSpectrumRunning ? _accent : null,
+                  ),
+                ),
               IconButton(
                 tooltip:
                     _testAudioRunning ? 'Stop test tone' : 'Play test tone',
@@ -1292,7 +1376,7 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
                   value: _pinkNoiseEnabled,
                   underline: const SizedBox.shrink(),
                   isDense: true,
-                  onChanged: _testAudioRunning
+                  onChanged: _testAudioRunning || _systemSpectrumRunning
                       ? null
                       : (value) {
                           if (value != null) {
@@ -1312,12 +1396,32 @@ class _EqDashboardState extends State<EqDashboard> with WidgetsBindingObserver {
                   .toDouble(),
               onChanged: _setTestFrequency,
             ),
+            if (_audioTestService.isSystemSpectrumSupported) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _toggleSystemSpectrum,
+                  icon: Icon(_systemSpectrumRunning
+                      ? Icons.stop_circle_outlined
+                      : Icons.monitor_heart_outlined),
+                  label: Text(_systemSpectrumRunning
+                      ? 'Stop PC audio monitor'
+                      : 'Monitor PC audio'),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Read-only capture from the current Windows playback device.',
+                style: TextStyle(color: _muted, fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+            ],
             const SizedBox(height: 4),
             SizedBox(
               height: 72,
               child: SpectrumStrip(
                 binsDb: _spectrumBins,
-                active: _testAudioRunning,
+                active: _testAudioRunning || _systemSpectrumRunning,
               ),
             ),
             const SizedBox(height: 6),

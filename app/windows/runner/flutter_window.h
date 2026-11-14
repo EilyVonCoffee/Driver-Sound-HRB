@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "../../../platform/windows/audio/EndpointNotificationClient.h"
+#include "../../../platform/windows/audio/WasapiLoopbackCapture.h"
 #include "../../../platform/windows/audio/WasapiToneEngine.h"
 #include "win32_window.h"
 
@@ -48,6 +49,7 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> audio_route_sink_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> audio_engine_channel_;
   std::unique_ptr<iem::windows_audio::WasapiToneEngine> audio_engine_;
+  std::unique_ptr<iem::windows_audio::WasapiLoopbackCapture> loopback_capture_;
   std::thread audio_route_thread_;
   HANDLE audio_route_stop_event_ = nullptr;
   std::atomic<bool> audio_route_watcher_running_{false};

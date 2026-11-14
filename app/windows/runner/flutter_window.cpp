@@ -114,6 +114,8 @@ bool FlutterWindow::OnCreate() {
           }));
 
   audio_engine_ = std::make_unique<iem::windows_audio::WasapiToneEngine>();
+  loopback_capture_ =
+      std::make_unique<iem::windows_audio::WasapiLoopbackCapture>();
   audio_engine_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), kAudioEngineChannel,
       &flutter::StandardMethodCodec::GetInstance());
@@ -142,6 +144,8 @@ void FlutterWindow::OnDestroy() {
   audio_route_sink_.reset();
   if (audio_engine_channel_) audio_engine_channel_->SetMethodCallHandler(nullptr);
   audio_engine_channel_.reset();
+  if (loopback_capture_) loopback_capture_->Stop();
+  loopback_capture_.reset();
   if (audio_engine_) audio_engine_->Stop();
   audio_engine_.reset();
   if (flutter_controller_) {
@@ -213,6 +217,46 @@ void FlutterWindow::HandleAudioEngineCall(
     }
     result->Success(flutter::EncodableValue(
         audio_engine_->SetFrequency(static_cast<float>(frequency))));
+    return;
+  }
+
+  if (call.method_name() == "startSystemSpectrum") {
+    if (!loopback_capture_) {
+      result->Error("audio_unavailable", "The Windows loopback analyzer is not initialized.");
+      return;
+    }
+    if (loopback_capture_->Start()) {
+      result->Success(flutter::EncodableValue(true));
+    } else {
+      result->Error("loopback_unavailable",
+                    "Could not capture the default Windows playback endpoint.");
+    }
+    return;
+  }
+
+  if (call.method_name() == "stopSystemSpectrum") {
+    if (loopback_capture_) loopback_capture_->Stop();
+    result->Success();
+    return;
+  }
+
+  if (call.method_name() == "isSystemSpectrumActive") {
+    result->Success(flutter::EncodableValue(
+        loopback_capture_ && loopback_capture_->IsRunning()));
+    return;
+  }
+
+  if (call.method_name() == "readSystemSpectrum") {
+    if (!loopback_capture_) {
+      result->Error("audio_unavailable", "The Windows loopback analyzer is not initialized.");
+      return;
+    }
+    std::array<float, iem::kSpectrumBinCount> bins{};
+    loopback_capture_->ReadSpectrum(bins.data(), bins.size());
+    flutter::EncodableList resultBins;
+    resultBins.reserve(bins.size());
+    for (const auto value : bins) resultBins.emplace_back(static_cast<double>(value));
+    result->Success(flutter::EncodableValue(std::move(resultBins)));
     return;
   }
 

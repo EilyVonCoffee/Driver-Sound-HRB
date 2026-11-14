@@ -1,8 +1,8 @@
-# IEM Driver
+# Driver-Sound-HRB
 
-Flutter-based 10-band parametric EQ controller and audio test utility for
-Android and Windows. The project is currently an **expert preview**, not a
-validated production system-wide equalizer.
+IEM Driver is a Flutter-based 10-band parametric EQ controller and audio test
+utility for Android and Windows. The project is currently an **expert preview**,
+not a validated production system-wide equalizer.
 
 ## Current capabilities
 
@@ -16,13 +16,15 @@ validated production system-wide equalizer.
   opaque for graph legibility.
 - Native low-level sine and pink-noise test signals with a live spectrum of the
   app-owned test stream.
+- On Windows, a user-started, read-only WASAPI loopback mode displays a live
+  spectrum of the current default playback endpoint without changing its audio.
 
 ## Platform status and limitations
 
 | Platform | Implemented path | Important limitation |
 | --- | --- | --- |
 | Android 13+ (API 33; min API 28) | `AudioDeviceCallback` route detection; Oboe test signal; opt-in best-effort global `DynamicsProcessing` with `Equalizer` fallback | Session-0 effects may be denied by the ROM/OEM. These APIs expose graphic bands, not the full PEQ Q/filter/preamp model. Spectrum is from the app test signal, not other apps. |
-| Windows 11 | MMDevice endpoint notifications; WASAPI test signal; opt-in Equalizer APO managed include/config updates | APO must be installed/configured for the active endpoint. Editing its Program Files config may require running the app elevated. Spectrum is not yet WASAPI loopback capture. |
+| Windows 11 | MMDevice endpoint notifications; WASAPI test signal and read-only loopback spectrum; opt-in Equalizer APO managed include/config updates | Loopback follows the endpoint active when capture starts; after a route change, stop and restart monitoring. APO must be installed/configured for the active endpoint, and editing its Program Files config may require elevation. Hardware/APO behavior still needs PC validation. |
 
 The UI reports whether the best-effort Android effect or APO include is active;
 that status is not a guarantee of identical system-wide behavior on every
@@ -67,4 +69,3 @@ Configure these GitHub Actions secrets first:
 The Windows installer warns if Equalizer APO is not detected. The application
 folder is packaged separately from its source; do not publish the unsigned
 local release APK as a distribution artifact.
-"# Driver-Sound-HRB" 

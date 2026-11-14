@@ -1,6 +1,6 @@
 # IEM Driver — checkpoint rilis
 
-Disimpan: 13 November 2026. Ini checkpoint kerja; belum berarti aplikasi sudah
+Disimpan: 15 November 2026. Ini checkpoint kerja; belum berarti aplikasi sudah
 lulus build akhir atau siap dipublikasikan.
 
 ## Verifikasi lanjutan (14 November 2026)
@@ -22,6 +22,27 @@ lulus build akhir atau siap dipublikasikan.
 - `README.md` dan `app/README.md` kini membedakan fitur yang ada dari gap
   system-wide/loopback serta menjelaskan konfigurasi signing.
 
+## Verifikasi dan perubahan (15 November 2026)
+
+- Ditambahkan `WasapiLoopbackCapture` untuk menangkap mix output endpoint
+  Windows default secara read-only, mengubah PCM float/16/24/32-bit menjadi
+  input analyzer, dan mengekspos start/stop/status/read lewat method channel.
+- UI Windows sekarang memiliki kontrol **Monitor PC audio** terpisah dari test
+  tone. Kedua mode saling eksklusif; monitor berhenti jika endpoint capture
+  berakhir dan perlu dimulai ulang setelah route audio berubah.
+- `iem_windows_endpoint` berhasil dikonfigurasi dan dibangun dengan CMake/MSBuild,
+  termasuk file loopback baru.
+- `dart format` selesai, `flutter analyze` bersih, dan seluruh 17 tes lulus.
+- `flutter build windows --release` dicoba lagi tetapi tetap tertahan karena
+  Developer Mode/plugin symlink support nonaktif. Loopback belum dapat diuji
+  runtime pada aplikasi Windows penuh atau perangkat audio fisik.
+- Ditambahkan root `.gitignore` untuk output CMake, build Flutter, dan bahan
+  signing lokal. README dirapikan dan diperbarui sesuai status loopback.
+- Estimasi: sekitar 70% implementasi fitur menuju expert preview, tetapi sekitar
+  55% kualifikasi paket uji lintas platform; persentase ini belum menilai
+  sertifikasi produksi. Build Windows penuh, signing, APO, dan tes hardware masih
+  menjadi gerbang rilis.
+
 ## Status saat jeda
 
 - UI Flutter memiliki PEQ 10-band interaktif, kontrol fader, delapan slot,
@@ -41,21 +62,22 @@ lulus build akhir atau siap dipublikasikan.
   diganti fade statis 200 ms tanpa jiggle/animasi charging; card status System
   EQ ditambahkan; overlay wallpaper dinaikkan ke 85%.
 - Dropdown Sine/Pink Noise sudah masuk dan teruji pada Flutter test suite.
-- File kerja tersimpan otomatis di folder workspace. Folder ini belum memiliki
-  metadata Git/remote; `gh` juga tidak tersedia dan konektor GitHub belum
-  terhubung, sehingga belum ada publikasi atau tag yang dibuat.
+- Repository lokal memakai branch `main` dan remote `origin` ke
+  `aantiosaputra11-glitch/Driver-Sound-HRB`; commit awal sudah dipush. Perubahan
+  checkpoint 15 November belum dipush. Belum ada tag/release GitHub.
 
 ## Batasan dan pekerjaan tersisa
 
-1. Jalankan `dart format`, `flutter analyze`, seluruh `flutter test`, build APK
-   Android release, dan build Windows; belum ada verifikasi setelah patch sesi
-   terakhir.
-2. Implementasikan/validasi WASAPI loopback untuk spectrum sistem. Saat ini
-   spectrum native masih berasal dari stream test internal, bukan seluruh audio
-   Windows.
+1. Aktifkan Windows Developer Mode (atau gunakan mesin dengan plugin symlink
+   support), lalu jalankan `flutter build windows --release` dan uji loopback
+   runtime pada endpoint nyata. Native target CMake, analyzer, dan 17 tes Flutter
+   sudah lolos; capture belum diuji pada aplikasi penuh.
+2. Pastikan monitoring loopback pulih/berhenti dengan benar saat default
+   endpoint berubah atau perangkat terputus.
 3. Tambahkan telemetri sample-rate/bit-depth yang benar-benar diambil dari OS;
    route card sekarang belum melaporkan nilai format stream aktual.
-4. Tambahkan quick picker profil jack analog dan pilihan UI pink noise.
+4. Quick picker jack analog dan pilihan UI pink noise sudah tersedia; validasi
+   pemilihan profil jack pada perangkat fisik masih diperlukan.
 5. Selesaikan izin Equalizer APO: konfigurasi di Program Files dapat memerlukan
    elevasi; service sekarang hanya melaporkan kegagalan, belum punya flow UAC.
    Verifikasi juga rollback/backup terhadap config yang berisi format newline
@@ -66,17 +88,16 @@ lulus build akhir atau siap dipublikasikan.
    menyediakan graphic EQ; Q, tipe filter PEQ, dan preamp tidak dapat diterapkan
    setara PEQ penuh. Rilis harus menyebutnya best-effort dan menguji perangkat
    fisik yang ditargetkan.
-8. Setelah repository/remote dan autentikasi GitHub tersedia, buat tag dan
-   publish hanya setelah build artifacts serta signing diverifikasi.
+8. Setelah build Windows, signing Android, APO, dan hardware diverifikasi,
+   unggah perubahan checkpoint, buat tag, lalu publish artifacts ke GitHub.
 
 ## Titik lanjut tercepat
 
-Mulai dengan memeriksa workflow/installer dan mengaktifkan Windows
-Developer Mode (atau build di mesin Windows yang mendukung symlink), lalu build
-full PC app. Minta pemilik menyediakan signing keystore dan akses repository/
-remote GitHub. Berikutnya lengkapi WASAPI loopback, telemetry format stream,
-quick-picker jack, lalu uji hardware. Jangan menyebutnya production-ready
-sebelum validasi perangkat dan publikasi dari repository pemilik selesai.
+Mulai dengan mengaktifkan Windows Developer Mode (atau build di mesin Windows
+yang mendukung plugin symlink), lalu build full PC app dan uji loopback. Berikutnya
+lengkapi telemetry format stream, verifikasi Equalizer APO dan Android pada
+hardware, siapkan signing keystore, lalu jalankan workflow rilis. Jangan
+menyebutnya production-ready sebelum validasi perangkat dan signing resmi selesai.
 
 ## Catatan rekayasa
 

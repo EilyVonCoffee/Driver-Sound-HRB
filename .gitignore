@@ -1,0 +1,12 @@
+# Native CMake verification builds
+/build/
+
+# Flutter/Dart generated state
+**/.dart_tool/
+**/build/
+**/.packages
+
+# Local signing material
+*.jks
+*.keystore
+key.properties
