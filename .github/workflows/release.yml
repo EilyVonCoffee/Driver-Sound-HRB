@@ -1,0 +1,113 @@
+name: Build and publish IEM Driver
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Java for Android release
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Install Flutter dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Check Dart formatting
+        working-directory: app
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze and test
+        working-directory: app
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Decode Android release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.IEM_RELEASE_KEYSTORE_BASE64 }}
+          IEM_RELEASE_STORE_FILE: ${{ runner.temp }}\iem-release.jks
+          IEM_RELEASE_STORE_PASSWORD: ${{ secrets.IEM_RELEASE_STORE_PASSWORD }}
+          IEM_RELEASE_KEY_ALIAS: ${{ secrets.IEM_RELEASE_KEY_ALIAS }}
+          IEM_RELEASE_KEY_PASSWORD: ${{ secrets.IEM_RELEASE_KEY_PASSWORD }}
+        shell: pwsh
+        run: |
+          $required = @(
+            $env:ANDROID_KEYSTORE_BASE64,
+            $env:IEM_RELEASE_STORE_PASSWORD,
+            $env:IEM_RELEASE_KEY_ALIAS,
+            $env:IEM_RELEASE_KEY_PASSWORD
+          )
+          if ($required | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
+            throw 'Set IEM_RELEASE_KEYSTORE_BASE64, IEM_RELEASE_STORE_PASSWORD, IEM_RELEASE_KEY_ALIAS, and IEM_RELEASE_KEY_PASSWORD before tagging a release.'
+          }
+          $bytes = [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64)
+          [IO.File]::WriteAllBytes($env:IEM_RELEASE_STORE_FILE, $bytes)
+
+      - name: Build signed Android APK
+        working-directory: app
+        env:
+          IEM_RELEASE_STORE_FILE: ${{ runner.temp }}\iem-release.jks
+          IEM_RELEASE_STORE_PASSWORD: ${{ secrets.IEM_RELEASE_STORE_PASSWORD }}
+          IEM_RELEASE_KEY_ALIAS: ${{ secrets.IEM_RELEASE_KEY_ALIAS }}
+          IEM_RELEASE_KEY_PASSWORD: ${{ secrets.IEM_RELEASE_KEY_PASSWORD }}
+        run: flutter build apk --release
+
+      - name: Verify Android release signature
+        shell: pwsh
+        run: |
+          $buildTools = Get-ChildItem (Join-Path $env:ANDROID_HOME 'build-tools') -Directory |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+          $apksigner = Join-Path $buildTools.FullName 'apksigner.bat'
+          & $apksigner verify --verbose app\build\app\outputs\flutter-apk\app-release.apk
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Windows application
+        working-directory: app
+        run: flutter build windows --release
+
+      - name: Package Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $compiler "/DMyAppVersion=$version" installer\IEMDriver.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Assemble Windows portable archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path app\build\windows\x64\runner\Release\* -DestinationPath dist\IEM-Driver-Windows-portable.zip -Force
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            app/build/app/outputs/flutter-apk/app-release.apk
+            dist/IEM-Driver-Setup-${{ github.ref_name }}.exe
+            dist/IEM-Driver-Windows-portable.zip

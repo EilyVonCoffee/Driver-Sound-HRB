@@ -1,0 +1,40 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run IEM Driver Flutter app",
+			"type": "shell",
+			"command": "Set-Location app; & 'C:\\Users\\alice\\AppData\\Local\\FlutterSDK\\bin\\flutter.bat' run -d windows",
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Run IEM Driver Flutter preview",
+			"type": "shell",
+			"command": "Set-Location app; & 'C:\\Users\\alice\\AppData\\Local\\FlutterSDK\\bin\\flutter.bat' run -d chrome",
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Build IEM Driver Android APK",
+			"type": "shell",
+			"command": "$env:JAVA_HOME='C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.3.9-hotspot'; $env:PATH='C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.3.9-hotspot\\bin;' + $env:PATH; Set-Location app; & 'C:\\Users\\alice\\AppData\\Local\\FlutterSDK\\bin\\flutter.bat' build apk --debug",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Build IEM Driver Windows",
+			"type": "shell",
+			"command": "Set-Location app; & 'C:\\Users\\alice\\AppData\\Local\\FlutterSDK\\bin\\flutter.bat' build windows --debug",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Build IEM Driver Android Release APK",
+			"type": "shell",
+			"command": "$env:JAVA_HOME='C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.3.9-hotspot'; $env:PATH='C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.3.9-hotspot\\bin;' + $env:PATH; Set-Location app; & 'C:\\Users\\alice\\AppData\\Local\\FlutterSDK\\bin\\flutter.bat' build apk --release",
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}
