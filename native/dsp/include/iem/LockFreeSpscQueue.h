@@ -11,6 +11,13 @@ namespace iem {
 // from empty, so usable capacity is Capacity - 1. The producer and consumer must
 // each be serialized to one thread.
 template <typename T, std::size_t Capacity>
+#if defined(_MSC_VER)
+// The two indices intentionally occupy separate cache lines. MSVC reports the
+// resulting tail padding as C4324; keep that expected warning local to this
+// cache-aligned real-time queue instead of weakening /WX for the whole runner.
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
 class LockFreeSpscQueue final {
     static_assert(Capacity >= 2, "Capacity must be at least two");
     static_assert(std::is_trivially_copyable<T>::value,
@@ -49,5 +56,8 @@ private:
     alignas(64) std::atomic<std::size_t> writeIndex_{0};
     alignas(64) std::atomic<std::size_t> readIndex_{0};
 };
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 }  // namespace iem

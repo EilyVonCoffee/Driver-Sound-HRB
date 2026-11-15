@@ -31,16 +31,15 @@ but that does not guarantee a safe acoustic SPL at the listener's ear.
 The Windows route listener, WASAPI test engine, and read-only WASAPI loopback
 spectrum capture compile as a standalone native target. The loopback monitor
 captures the current default playback endpoint only while enabled; stop and
-restart it after changing Windows output devices. Building the full Flutter app
-requires Windows Developer Mode or another environment with plugin symlink
-support; the current workstation has that prerequisite disabled. Equalizer APO
+restart it after changing Windows output devices. A full Flutter Windows release
+build and Inno Setup installer compile have succeeded locally. Equalizer APO
 integration manages a dedicated include and backs up `config.txt`; the active
 APO endpoint and write permissions must be verified on the test PC. Running
 IEM Driver elevated may be required to change the APO configuration.
 
 Windows spectrum now has a read-only WASAPI loopback source in addition to the
-app-owned test signal. Native compilation is verified, but live capture and
-route-change behavior still require testing in a full Windows build.
+app-owned test signal. Native and full Flutter compilation are verified, but
+live capture and route-change behavior still require testing on Windows audio.
 
 ## Checks completed in the current workspace
 
@@ -53,9 +52,10 @@ route-change behavior still require testing in a full Windows build.
 - Android debug APK: built and signature verified with the development key.
 - Windows `iem_windows_endpoint` native CMake target, including loopback capture:
   compiled successfully.
-- Full Flutter Windows build: blocked because Windows Developer Mode/symlink
-  support is disabled; this is an environment prerequisite, not a source build
-  result.
+- Full Flutter Windows release build: succeeded after enabling Developer Mode.
+- Inno Setup compiled `dist/IEM-Driver-Setup-v0.1.0.exe`; the portable archive
+  was also assembled. Installation and live Windows audio/APO behavior remain
+  untested.
 
 For a signed Android release, provide `IEM_RELEASE_STORE_FILE`,
 `IEM_RELEASE_STORE_PASSWORD`, `IEM_RELEASE_KEY_ALIAS`, and

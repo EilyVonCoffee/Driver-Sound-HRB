@@ -1,7 +1,7 @@
 # IEM Driver — checkpoint rilis
 
-Disimpan: 15 November 2026. Ini checkpoint kerja; belum berarti aplikasi sudah
-lulus build akhir atau siap dipublikasikan.
+Disimpan: 15 November 2026. Windows release dan installer berhasil dibangun;
+checkpoint ini belum berarti paket sudah ditandatangani atau siap dipublikasikan.
 
 ## Verifikasi lanjutan (14 November 2026)
 
@@ -33,15 +33,29 @@ lulus build akhir atau siap dipublikasikan.
 - `iem_windows_endpoint` berhasil dikonfigurasi dan dibangun dengan CMake/MSBuild,
   termasuk file loopback baru.
 - `dart format` selesai, `flutter analyze` bersih, dan seluruh 17 tes lulus.
-- `flutter build windows --release` dicoba lagi tetapi tetap tertahan karena
-  Developer Mode/plugin symlink support nonaktif. Loopback belum dapat diuji
-  runtime pada aplikasi Windows penuh atau perangkat audio fisik.
+- Setelah Developer Mode diaktifkan, `flutter build windows --release` berhasil.
+  Build awal menemukan MSVC C4324 pada indeks cache-line-aligned SPSC queue;
+  warning tersebut kini ditekan lokal pada deklarasi queue dan build ulang
+  berhasil. Loopback belum diuji runtime pada endpoint fisik.
 - Ditambahkan root `.gitignore` untuk output CMake, build Flutter, dan bahan
   signing lokal. README dirapikan dan diperbarui sesuai status loopback.
-- Estimasi: sekitar 70% implementasi fitur menuju expert preview, tetapi sekitar
-  55% kualifikasi paket uji lintas platform; persentase ini belum menilai
-  sertifikasi produksi. Build Windows penuh, signing, APO, dan tes hardware masih
-  menjadi gerbang rilis.
+- Estimasi: sekitar 70% implementasi fitur menuju expert preview dan 65%
+  kualifikasi paket lintas platform; angka ini bukan sertifikasi produksi.
+  Signing resmi, workflow GitHub, APO, dan tes hardware masih menjadi gerbang.
+- Installer Inno diperkuat dengan pemeriksaan compile-time untuk executable
+  hasil build, target x64-compatible, ikon aplikasi, dan tautan dukungan. Inno
+  Setup 6.7.3 berhasil mengompilasi installer lokal tanpa warning arsitektur.
+- Workflow rilis kini mensyaratkan tag stabil `vMAJOR.MINOR.PATCH` cocok dengan
+  versi `app/pubspec.yaml`, memverifikasi APK bertanda tangan serta mengecek
+  installer dan portable ZIP sebelum publish. Pengecekan APO installer sekarang
+  mencari direktori instalasi default, bukan file konfigurasi yang bisa belum
+  dibuat.
+- Android release APK berhasil dibangun ulang dengan JDK 25 melalui `JAVA_HOME`
+  sementara, tetapi tidak memiliki signature rilis. Build pertama memilih JVM 8
+  Oracle dari PATH dan gagal; konfigurasi global tidak diubah.
+- Installer `dist/IEM-Driver-Setup-v0.1.0.exe` dan portable
+  `dist/IEM-Driver-Windows-portable.zip` berhasil dibuat lokal. Belum dilakukan
+  install/uninstall smoke test, code signing Windows, atau uji APO/audio nyata.
 
 ## Status saat jeda
 
@@ -57,6 +71,9 @@ lulus build akhir atau siap dipublikasikan.
   membuat backup `config.txt`. Pengujian build akhir/izin tulis belum selesai.
 - Gradle disiapkan untuk minSdk 28, targetSdk 34, ProGuard, serta signing dari
   environment variable; tidak ada keystore/password yang boleh masuk repo.
+- Audit lokal tidak menemukan release keystore, `key.properties`, atau
+  `IEM_RELEASE_*` credentials. Hanya debug keystore yang tersedia; jangan pakai
+  itu untuk rilis. APK lokal terbaru karena itu unsigned.
 - Perubahan sesi terakhir yang sudah tersimpan: runner Windows menerima flag
   pink-noise dan tidak lagi mengirim PEQ ke test engine; indikator perangkat
   diganti fade statis 200 ms tanpa jiggle/animasi charging; card status System
@@ -68,10 +85,8 @@ lulus build akhir atau siap dipublikasikan.
 
 ## Batasan dan pekerjaan tersisa
 
-1. Aktifkan Windows Developer Mode (atau gunakan mesin dengan plugin symlink
-   support), lalu jalankan `flutter build windows --release` dan uji loopback
-   runtime pada endpoint nyata. Native target CMake, analyzer, dan 17 tes Flutter
-   sudah lolos; capture belum diuji pada aplikasi penuh.
+1. Uji installer dan portable Windows pada PC bersih; verifikasi Equalizer APO,
+   izin tulis konfigurasi, loopback, pergantian endpoint, dan rollback.
 2. Pastikan monitoring loopback pulih/berhenti dengan benar saat default
    endpoint berubah atau perangkat terputus.
 3. Tambahkan telemetri sample-rate/bit-depth yang benar-benar diambil dari OS;
@@ -82,22 +97,23 @@ lulus build akhir atau siap dipublikasikan.
    elevasi; service sekarang hanya melaporkan kegagalan, belum punya flow UAC.
    Verifikasi juga rollback/backup terhadap config yang berisi format newline
    berbeda.
-6. Buat installer Inno Setup dengan dependency check APO, dokumentasi rilis,
-   dan GitHub Actions workflow. Uji instalasi/update/uninstall di Windows bersih.
+6. Installer dan GitHub Actions workflow sudah dibuat; uji instalasi,
+   update/uninstall, dan jalankan workflow CI sebelum membuat rilis publik.
 7. Global `AudioEffect` session 0 Android tidak dijamin oleh OEM dan hanya
    menyediakan graphic EQ; Q, tipe filter PEQ, dan preamp tidak dapat diterapkan
    setara PEQ penuh. Rilis harus menyebutnya best-effort dan menguji perangkat
    fisik yang ditargetkan.
-8. Setelah build Windows, signing Android, APO, dan hardware diverifikasi,
-   unggah perubahan checkpoint, buat tag, lalu publish artifacts ke GitHub.
+8. Setelah signing Android, code signing Windows (bila digunakan), APO, dan
+   hardware diverifikasi, minta persetujuan sebelum push, membuat tag, atau
+   memublikasikan artifacts ke GitHub.
 
 ## Titik lanjut tercepat
 
-Mulai dengan mengaktifkan Windows Developer Mode (atau build di mesin Windows
-yang mendukung plugin symlink), lalu build full PC app dan uji loopback. Berikutnya
-lengkapi telemetry format stream, verifikasi Equalizer APO dan Android pada
-hardware, siapkan signing keystore, lalu jalankan workflow rilis. Jangan
-menyebutnya production-ready sebelum validasi perangkat dan signing resmi selesai.
+Berikutnya siapkan release keystore dan GitHub Actions secrets, lalu uji
+installer/loopback/Equalizer APO pada PC dan global AudioEffect pada Android
+target. Jalankan workflow rilis hanya setelah gates lolos dan dengan persetujuan
+pengguna. Jangan menyebutnya production-ready sebelum validasi perangkat dan
+signing resmi selesai.
 
 ## Catatan rekayasa
 

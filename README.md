@@ -66,6 +66,8 @@ Configure these GitHub Actions secrets first:
 - `IEM_RELEASE_KEY_ALIAS`
 - `IEM_RELEASE_KEY_PASSWORD`
 
-The Windows installer warns if Equalizer APO is not detected. The application
-folder is packaged separately from its source; do not publish the unsigned
-local release APK as a distribution artifact.
+The Windows installer warns if the default Equalizer APO installation folder
+is not detected. The application folder is packaged separately from its
+source; do not publish the unsigned local release APK as a distribution
+artifact. The workflow rejects tags that do not match `app/pubspec.yaml` and
+checks that all three release artifacts exist before publishing.

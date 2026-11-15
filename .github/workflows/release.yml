@@ -15,6 +15,21 @@ jobs:
       - name: Check out tagged source
         uses: actions/checkout@v4
 
+      - name: Validate release tag and app version
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag '$tag' must use the stable vMAJOR.MINOR.PATCH format."
+          }
+          $pubspec = Get-Content app\pubspec.yaml -Raw
+          if ($pubspec -notmatch '(?m)^version:\s*(?<version>\d+\.\d+\.\d+)(?:\+\d+)?\s*$') {
+            throw 'Could not read a stable MAJOR.MINOR.PATCH version from app/pubspec.yaml.'
+          }
+          if ($Matches.version -ne $tag.Substring(1)) {
+            throw "Release tag $tag does not match app/pubspec.yaml version $($Matches.version). Update the version before tagging."
+          }
+
       - name: Set up Java for Android release
         uses: actions/setup-java@v4
         with:
@@ -78,11 +93,15 @@ jobs:
       - name: Verify Android release signature
         shell: pwsh
         run: |
+          $apk = 'app\build\app\outputs\flutter-apk\app-release.apk'
+          if (-not (Test-Path $apk -PathType Leaf)) { throw "Signed APK not found: $apk" }
           $buildTools = Get-ChildItem (Join-Path $env:ANDROID_HOME 'build-tools') -Directory |
             Sort-Object { [version]$_.Name } -Descending |
             Select-Object -First 1
+          if (-not $buildTools) { throw 'Android SDK build-tools were not installed.' }
           $apksigner = Join-Path $buildTools.FullName 'apksigner.bat'
-          & $apksigner verify --verbose app\build\app\outputs\flutter-apk\app-release.apk
+          if (-not (Test-Path $apksigner -PathType Leaf)) { throw "apksigner not found: $apksigner" }
+          & $apksigner verify --verbose $apk
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Windows application
@@ -94,19 +113,28 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $windowsExe = 'app\build\windows\x64\runner\Release\iem_driver.exe'
+          if (-not (Test-Path $windowsExe -PathType Leaf)) { throw "Windows release executable not found: $windowsExe" }
           $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $compiler -PathType Leaf)) { throw "Inno Setup compiler not found: $compiler" }
           & $compiler "/DMyAppVersion=$version" installer\IEMDriver.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installer = "dist\IEM-Driver-Setup-v$version.exe"
+          if (-not (Test-Path $installer -PathType Leaf)) { throw "Installer output not found: $installer" }
 
       - name: Assemble Windows portable archive
         shell: pwsh
         run: |
-          Compress-Archive -Path app\build\windows\x64\runner\Release\* -DestinationPath dist\IEM-Driver-Windows-portable.zip -Force
+          $releaseDir = 'app\build\windows\x64\runner\Release'
+          if (-not (Test-Path "$releaseDir\iem_driver.exe" -PathType Leaf)) { throw "Windows release executable not found in $releaseDir" }
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath dist\IEM-Driver-Windows-portable.zip -Force
+          if (-not (Test-Path 'dist\IEM-Driver-Windows-portable.zip' -PathType Leaf)) { throw 'Windows portable archive was not created.' }
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             app/build/app/outputs/flutter-apk/app-release.apk
             dist/IEM-Driver-Setup-${{ github.ref_name }}.exe

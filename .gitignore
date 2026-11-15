@@ -6,6 +6,9 @@
 **/build/
 **/.packages
 
+# Local release bundles
+/dist/
+
 # Local signing material
 *.jks
 *.keystore
