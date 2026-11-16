@@ -3,8 +3,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:iem_driver/models/eq_band.dart';
 import 'package:iem_driver/main.dart';
 import 'package:iem_driver/widgets/eq_band_slider_bank.dart';
+import 'package:iem_driver/widgets/route_device_icon.dart';
 
 void main() {
+  testWidgets('route indicator clearly reports a disconnected device',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: RouteDeviceIcon(
+          route: null,
+          accent: const Color(0xFFFFB000),
+        ),
+      ),
+    ));
+
+    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.text('No audio device connected'), findsOneWidget);
+  });
+
   testWidgets('IEM Driver EQ screen renders', (WidgetTester tester) async {
     await tester.pumpWidget(const IemDriverApp());
     await tester.pumpAndSettle();

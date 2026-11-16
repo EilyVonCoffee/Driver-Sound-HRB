@@ -68,7 +68,7 @@ class RouteDeviceIcon extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                current?.name ?? 'Waiting for a connected device',
+                current?.name ?? 'No audio device connected',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFFEDEDED), fontSize: 14),
@@ -94,7 +94,7 @@ class RouteDeviceIcon extends StatelessWidget {
             Text(
               isActive
                   ? 'Connected'
-                  : (current == null ? 'Offline' : 'Detected'),
+                  : (current == null ? 'Disconnected' : 'Detected'),
               style: TextStyle(
                 color: isActive
                     ? const Color(0xFF4CC38A)
